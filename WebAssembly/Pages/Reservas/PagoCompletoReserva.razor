@@ -1,0 +1,168 @@
+﻿@page "/pago-completo-reserva"
+@page "/pago-completo-reserva/{Id:int}"
+
+@inject IDetalleReservaServicio detalleServicio
+@inject ICarritoServicio carritoServicio
+@inject ICheckoutService checkoutService
+@inject IToastService toastService
+@inject SweetAlertService Swal
+@inject NavigationManager navigationManager
+
+@using Microsoft.AspNetCore.Components.Authorization
+@using System.Security.Claims
+
+<div class="row mt-4">
+
+    <div class="col-sm-8">
+        <div class="card mb-3">
+
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm bg-light table-bordered">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Id Producto</th>
+                                <th>Cantidad</th>
+                                <th>Precio</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (modelo != null)
+                            {
+                                foreach (var item in modelo)
+                                {
+                                    <tr>
+                                        <td valign="middle">@item.IdProducto</td>
+                                        <td valign="middle">@item.Cantidad</td>
+                                        <td valign="middle">@item.Total</td>
+                                    </tr>
+                                }
+                            }
+                            else
+                            {
+                                <tr>
+                                    <td colspan="6">
+                                        <div class="alert alert-warning" role="alert">
+                                            No hay productos en el carrito
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-sm-4">
+        <div class="card mb-3">
+            <div class="card-body">
+              
+                <AuthorizeView>
+                    <NotAuthorized>
+                        <div class="alert alert-danger mt-2" role="alert">
+                            Debe iniciar sesion para poder realizar la compra
+                        </div>
+                    </NotAuthorized>
+                </AuthorizeView>
+
+
+                <hr />
+                <div class="d-flex justify-content-between">
+                    <div>Monto total: </div>
+                    <div>₡ @(modelo != null && modelo.Any() ? modelo.Sum(i => i.Total ?? 0) : 0)</div>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <div>Total a pagar (75% restante):</div>
+                    <div>
+
+                        @if (modelo != null && modelo.Any())
+                        {
+
+                            decimal? totalSum = modelo.Sum(i => i.Total ?? 0);
+                            decimal totalSumNonNull = totalSum ?? 0m;
+                            decimal resultado = totalSumNonNull * 0.75m;
+                            decimal resultadoRedondeado = Math.Round(resultado, 2);
+
+                            <p>₡ @resultadoRedondeado </p>
+                        }
+                        else
+                        {
+                            <p>error</p>
+                        }
+                    </div>
+                </div>
+
+                <div class="mt-2">
+                    <div class="d-grid gap-1">
+                        <button class="btn btn-outline-secondary float-end" @onclick="Checkout" disabled="@disabled">Procesar pago</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+
+    private bool disabled = true;
+
+    [Parameter]
+    public int Id { get; set; }
+
+    private List<DetalleReservaDTO>? modelo = null;
+
+    [CascadingParameter]
+    private Task<AuthenticationState> authenticationState { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        //acceder a la autenticacion
+        var authState = await authenticationState;
+
+        if (authState.User.Identity.IsAuthenticated)
+        {
+            disabled = false;
+        }
+
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Id != 0)
+        {
+            var response = await detalleServicio.ObtenerDetallesReserva(Id);
+
+            if (response.Ok && response.Resultado != null)
+            {
+                modelo = (List<DetalleReservaDTO>)response.Resultado!;
+            }
+            else
+            {
+                modelo = new List<DetalleReservaDTO>();
+                toastService.ShowError(response.Message);
+            }
+        }
+    }
+
+
+    async Task Checkout()
+    {
+        List<ItemDTO> productos = new List<ItemDTO>();
+
+        foreach (var item in modelo) 
+        {
+            productos.Add(new ItemDTO()
+                {
+                    IdProducto = item.IdProducto, 
+                    Nombre = item.IdProducto.ToString(), 
+                    Cantidad = item.Cantidad,
+                    Precio = item.Total * 0.75m, 
+                });
+        }
+
+        var url = await checkoutService.Checkout2(productos);
+        navigationManager.NavigateTo(url);
+    }
+}

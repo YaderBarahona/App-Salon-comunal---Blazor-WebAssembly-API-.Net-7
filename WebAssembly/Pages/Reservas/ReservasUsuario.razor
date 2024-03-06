@@ -1,0 +1,108 @@
+﻿@page "/reservas-usuario"
+
+@inject IReservaServicio reservaServicio
+
+@using Microsoft.AspNetCore.Components.Authorization
+@using System.Security.Claims
+
+@attribute [Authorize(Roles = "Cliente")];
+
+@if (listaReservas != null && listaReservas.Any())
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Fecha de Reserva</th>
+                <th>Fecha Evento</th>
+                <th>Total precio</th>
+                <th>Total Pagado</th>
+                <th>Estado</th>
+                <th>Acción</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var reserva in listaReservas)
+            {
+                <tr>
+                    <td>@reserva.FechaReserva</td>
+                    <td>@reserva.FechaEvento</td>
+                    <td>@reserva.TotalPrecio</td>
+                    <td>@reserva.TotalPagado</td>
+                    <td>
+                        @if (reserva.EstadoReserva)
+                        {
+                        <span style="color: green;"> Pago completo </span>
+                        }
+                        else
+                        {
+                        <span style="color: gray;"> Pago incompleto </span>
+                        }
+                    </td>
+                    @if(reserva.EstadoReserva)
+                    {
+                        <th>Los pagos ya se han efectuado</th>
+                    }
+                    else
+                    {
+                        if ((reserva.FechaEvento - DateTime.Now).TotalDays <= 2)
+                        {
+                            <td valign="middle">
+                                <span style="color: red;"> El período de cancelación ha expirado </span>
+                            </td>
+                        }
+                        else
+                        {
+                            <td valign="middle">
+                                @{
+                                    var id = @reserva.IdReserva;
+                                }
+                                <a @onclick="(async() => await AgregarID(id))" href="/pago-completo-reserva/@reserva.IdReserva" class="btn btn-outline-dark">
+                                    <i class="oi oi-credit-card"></i>
+                                </a>
+                            </td>
+                        }
+                    }
+                    
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+else
+{
+    <p>No tienes reservas.</p>
+}
+
+@code {
+    private List<ReservaDTO>? listaReservas = null;
+
+
+    [CascadingParameter]
+    private Task<AuthenticationState> authenticationState { get; set; }
+
+    private async Task ObtenerReservas()
+    {
+        var authState = await authenticationState;
+        string idUsuario = authState.User.Claims.Where(c => c.Type == ClaimTypes.NameIdentifier).Select(c => c.Value).Single();
+
+        var response = await reservaServicio.ReservasUsuario(Convert.ToInt32(idUsuario));
+
+        if (response.Ok)
+        {
+            listaReservas = (List<ReservaDTO>)response.Resultado!;
+        }
+        
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ObtenerReservas();
+    }
+
+    private async Task AgregarID(int id)
+    {
+ 
+        await reservaServicio.AgregarID(id);
+    }
+
+}

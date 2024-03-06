@@ -1,0 +1,130 @@
+﻿@page "/login"
+
+@layout LoginLayout
+
+@using Blazored.Toast.Services;
+@using DTO;
+@using WebAssembly.Auth;
+@using WebAssembly.Servicios.IServicios;
+@using Microsoft.AspNetCore.Components.Authorization;
+@using WebAssembly.Shared;
+
+@inject IUsuarioServicio usuarioServicio;
+
+@inject NavigationManager navigationManager;
+@inject IToastService toastService;
+@inject AuthenticationStateProvider authenticationProvider;
+
+@inject IConfiguration configuration
+@inject IReCaptchaService reCaptchaService
+
+
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-lg-5">
+            <div class="card rounded-lg mt-5">
+                <div class="card-header"><h3 class="text-center font-weight-light my-4">Login</h3></div>
+                <div class="card-body">
+                    <EditForm Model="modelo" OnValidSubmit="Iniciar">
+                        <DataAnnotationsValidator></DataAnnotationsValidator>
+                        <div class="form-floating mb-3">
+                            <input class="form-control" id="inputEmail" type="email" placeholder="admin@example.com" @bind-value="modelo.Correo" autocomplete="off" />
+                            <label for="inputEmail">Correo</label>
+                            <ValidationMessage For="@(()=>modelo.Correo)" />
+                        </div>
+                        <div class="form-floating mb-3">
+                            <input class="form-control" id="inputPassword" type="password" placeholder="123" @bind-value="modelo.Clave" autocomplete="off" />
+                            <label for="inputPassword">Contraseña</label>
+                            <ValidationMessage For="@(()=>modelo.Clave)" />
+                        </div>
+
+                        <div class="d-grid gap-1 mt-4 mb-0">
+
+                            <WebAssembly.Pages.Autorizacion.ReCaptcha SiteKey="@_siteKey" OnSuccess="OnSuccess" OnExpired="OnExpired">
+
+
+                            </WebAssembly.Pages.Autorizacion.ReCaptcha>
+                            <span>@_ReCaptchaMsg</span>
+
+                        </div>
+
+                        <div class="d-grid gap-1 mt-4 mb-0">
+                            <button class="btn btn-primary" type="submit" disabled="@disabled">Ingresar</button>
+                        </div>
+                    </EditForm>
+                </div>
+                <div class="card-footer text-center py-3">
+                    <div class="small"><a href="/registrarse">No tienes una cuenta? Registrate!</a></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private LoginDTO modelo = new LoginDTO();
+
+    private bool disabled = true;
+
+    private async Task Iniciar()
+    {
+        var response = await usuarioServicio.Autorizacion(modelo);
+
+        if (response.Ok)
+        {
+            SesionDTO sesion = (SesionDTO)response.Resultado!;
+
+            var autenticacion = (Authentication)authenticationProvider;
+
+            await autenticacion.ActualizarEstadoAuth(sesion);
+
+            if (sesion.Rol.ToLower() == "cliente")
+            {
+                navigationManager.NavigateTo("/catalogo");
+            }
+            else
+            {
+                navigationManager.NavigateTo("/dashboard");
+            }
+        }
+        else
+        {
+            toastService.ShowWarning(response.Message!);
+        }
+    }
+
+    private string _ReCaptchaMsg = "";
+    private string _siteKey = "";
+    private string _secretKey = "";
+
+    protected override void OnInitialized()
+    {
+
+        _siteKey = configuration["SiteKey"];
+        _secretKey = configuration["SecretKey"];
+
+    }
+
+    private async void OnSuccess(string reCaptchaResponse)
+    {
+        var isValid = await reCaptchaService.ValidateResponse(reCaptchaResponse, _secretKey);
+
+        _ReCaptchaMsg = isValid ? "" : "Error, intenta de nuevo..";
+
+
+        if (isValid)
+        {
+            disabled = false;
+        } 
+
+        StateHasChanged();
+    }
+
+    private void OnExpired()
+    {
+        _ReCaptchaMsg = "Expired";
+        StateHasChanged();
+    }
+
+
+}

@@ -1,0 +1,71 @@
+﻿@page "/reservas-admin"
+
+@inject IReservaServicio reservaServicio
+
+@using Microsoft.AspNetCore.Components.Authorization
+@using System.Security.Claims
+
+@attribute [Authorize(Roles = "Administrador")];
+
+@if (listaReservas != null && listaReservas.Any())
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Fecha de Reserva</th>
+                <th>Fecha Evento</th>
+                <th>Total precio</th>
+                <th>Total Pagado</th>
+                <th>Estado</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var reserva in listaReservas)
+            {
+                <tr>
+                    <td>@reserva.IdReserva</td>
+                    <td>@reserva.FechaReserva</td>
+                    <td>@reserva.FechaEvento</td>
+                    <td>@reserva.TotalPrecio</td>
+                    <td>@reserva.TotalPagado</td>
+                    <td>
+                        @if (reserva.EstadoReserva)
+                        {
+                            <span style="color: green;"> Pago completo </span>
+                        }
+                        else
+                        {
+                            <span style="color: gray;"> Pago incompleto </span>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+else
+{
+    <p>No hay reservas registradas</p>
+}
+
+@code {
+    private List<ReservaDTO>? listaReservas = null;
+
+    private async Task ObtenerReservas()
+    {
+        var response = await reservaServicio.Lista();
+
+        if (response.Ok)
+        {
+            listaReservas = (List<ReservaDTO>)response.Resultado!;
+        }
+
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ObtenerReservas();
+    }
+
+}

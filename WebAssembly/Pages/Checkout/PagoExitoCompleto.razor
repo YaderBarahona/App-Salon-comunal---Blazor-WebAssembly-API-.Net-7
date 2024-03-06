@@ -1,0 +1,111 @@
+﻿@page "/pago-exito-completo"
+
+@inject IDetalleReservaServicio detalleServicio
+@inject ICarritoServicio carritoServicio
+@inject IReservaServicio reservaServicio
+@inject IToastService toastService
+@inject NavigationManager navigationManager
+
+@inject IEmailServicio EmailSenderService
+
+@using Microsoft.AspNetCore.Components.Authorization
+@using System.Security.Claims
+@using global::Utilidades;
+
+@attribute [Authorize(Roles = "Administrador, Cliente")];
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-6 offset-md-3">
+            <div class="mensaje text-center">
+                <h4>Pago completo realizado con éxito</h4>
+                <p>¡Gracias por tu compra!</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    //habilitar o deshabilitar boton de pago
+    private bool disabled = true;
+
+    private decimal? totalPagar = 0;
+
+    private decimal? totalPagado = 0;
+
+    private List<DetalleReservaDTO>? modelo = null;
+
+
+    [CascadingParameter]
+    private Task<AuthenticationState> authenticationState { get; set; }
+
+    private bool EsRutaPagoExitoso(string url)
+    {
+        // Verificar si la URL termina con "/pago-exito"
+        return url.StartsWith("https://localhost:7290/pago-exito-completo", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private async Task ActualizarReserva()
+    {
+        List<DetalleReservaDTO> detalle = new List<DetalleReservaDTO>();
+
+        var authState = await authenticationState;
+        string idUsuario = authState.User.Claims.Where(c => c.Type == ClaimTypes.NameIdentifier).Select(c => c.Value).Single();
+
+        var idReserva = await reservaServicio.ObtenerID();
+      
+        var response = await reservaServicio.ActualizarPago(Convert.ToInt32(idReserva));
+
+        if (response.Ok)
+        {
+            toastService.ShowSuccess("Reserva actualizada con éxito");
+            //navigationManager.NavigateTo("/catalogo");
+        }
+        else
+        {
+            toastService.ShowError(response.Message);
+        }
+    }
+
+    private async Task VerificarYGuardarReserva()
+    {
+        // Obtener la URL actual
+        var currentUri = navigationManager.Uri;
+
+        // Verificar si la URL actual es la URL de éxito de Stripe
+        if (EsRutaPagoExitoso(currentUri))
+        {
+            await ActualizarReserva();
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+
+        // Guardar la reserva si la URL actual es la URL de éxito de Stripe
+        await VerificarYGuardarReserva();
+
+        await SendEmail();
+    }
+
+
+    private async Task SendEmail()
+    {
+        var authState = await authenticationState;
+        string usuario = authState.User.Claims.Where(c => c.Type == ClaimTypes.Name).Select(c => c.Value).Single();
+        string email = authState.User.Claims.Where(c => c.Type == ClaimTypes.Email).Select(c => c.Value).Single();
+
+        MailRequest mail = new MailRequest
+            {
+                Subject = "Pago completo realizado con éxito",
+                Email = email,
+                //Email = "oxtr_ayqdl55@bozev.com",
+                body = "Hola, este correo es para informar sobre la verificación del pago completo del usuario: " + usuario
+            };
+
+        await EmailSenderService.SendEmailAsync(mail);
+
+        toastService.ShowSuccess("Se ha enviado un correo eléctronico");
+
+    }
+}

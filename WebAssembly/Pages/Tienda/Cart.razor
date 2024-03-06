@@ -1,0 +1,217 @@
+﻿@page "/cart"
+
+@inject ICarritoServicio carritoServicio
+@inject ICheckoutService checkoutService
+@inject IReservaServicio reservaServicio
+@inject IToastService toastService
+@inject NavigationManager navigationManager
+
+@using Microsoft.AspNetCore.Components.Authorization
+@using System.Security.Claims
+
+
+<div class="row mt-4">
+
+    @* INFORMACION DE LOS PRODUCTOS AGREGADOS EN EL CARRITO *@
+
+    <div class="col-sm-8">
+        <div class="card mb-3">
+
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm bg-light table-bordered">
+                        <thead class="table-dark">
+                            <tr>
+                                <th style="width:102px"></th>
+                                <th>Producto</th>
+                                <th>Precio</th>
+                                <th>Cantidad</th>
+                                <th>Total</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+
+                            @if (lista.Any())
+                            {
+                                foreach (var item in lista)
+                                {
+                                    <tr>
+                                        <td valign="middle">
+                                            <img class="card-img-top" src="@item.Producto.Imagen" style="width:100px">
+                                        </td>
+                                        <td valign="middle">@item.Producto.Nombre</td>
+                                        <td valign="middle">@item.Precio</td>
+                                        <td valign="middle" align="center">
+                                            <div class="btn-group" role="group">
+                                                <button type="button" class="btn btn-outline-dark" @onclick="(() =>Disminuir(item.Producto.IdProducto))">
+                                                    <i class="oi oi-minus"></i>
+                                                </button>
+                                                <input class="form-control" readonly="readonly" style="width:50px" @bind-value="item.Cantidad" />
+                                                <button type="button" class="btn btn-outline-dark" @onclick="(() =>Aumentar(item.Producto.IdProducto))">
+                                                    <i class="oi oi-plus"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                        <td valign="middle">@item.Total</td>
+                                        <td valign="middle">
+                                            <button type="button" class="btn btn-outline-dark" @onclick="(async () => await Eliminar(item.Producto.IdProducto))">
+                                                <i class="oi oi-trash"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                            else
+                            {
+                                <tr>
+                                    <td colspan="6">
+                                        <div class="alert alert-warning" role="alert">
+                                            No hay productos en el carrito
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-sm-4">
+        <div class="card mb-3">
+            <div class="card-body">
+              
+                <AuthorizeView>
+                    <NotAuthorized>
+                        <div class="alert alert-danger mt-2" role="alert">
+                            Debe iniciar sesion para poder realizar la compra
+                        </div>
+                    </NotAuthorized>
+                </AuthorizeView>
+
+                <hr />
+                <div class="d-flex justify-content-between">
+                    <div>Monto total: </div>
+                    <div>₡ @(lista.Sum(i => i.Total))</div>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <div>Total a pagar (25%):</div>
+                    <div>
+                        @{
+                            decimal? totalSum = lista.Sum(i => i.Total);
+                            decimal totalSumNonNull = totalSum ?? 0m;
+                            decimal resultado = totalSumNonNull * 0.25m;
+                            decimal resultadoRedondeado = Math.Round(resultado, 2);
+                        }
+
+                        ₡ @resultadoRedondeado
+                    </div>
+                </div>
+                <div class="mt-2">
+                    <div class="d-grid gap-1">
+                        <button class="btn btn-outline-secondary float-end" @onclick="Checkout" disabled="@disabled">Procesar pago</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+@code {
+    //habilitar o deshabilitar boton de pago
+    private bool disabled = true;
+
+    private List<CarritoDTO> lista = new List<CarritoDTO>();
+
+    private decimal? totalPagar = 0;
+
+    private decimal? totalPagado = 0;
+
+    [CascadingParameter]
+    private Task<AuthenticationState> authenticationState { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        //traer informacion de localstorage
+        lista = await carritoServicio.DevolverCarrito();
+
+        //acceder a la autenticacion
+        var authState = await authenticationState;
+
+        if (authState.User.Identity.IsAuthenticated)
+        {
+            disabled = false;
+        }
+
+    }
+
+    async Task Checkout()
+    {
+        if (lista is null)
+        {
+            toastService.ShowWarning("No se encontraron productos..");
+            return;
+        }
+
+        List<ItemDTO> productos = new List<ItemDTO>();
+
+
+        foreach (var item in lista)
+        {
+            productos.Add(new ItemDTO()
+                {
+                    IdProducto = item.Producto.IdProducto,
+                    Nombre = item.Producto.Nombre,
+                    Cantidad = item.Cantidad,
+                    Precio = item.Precio * 0.25m,
+                });
+        }
+
+        var url = await checkoutService.Checkout(productos);
+        navigationManager.NavigateTo(url);
+
+    }
+
+    //evento para disminuir la cantidad de producto
+    private void Disminuir(int id)
+    {
+        //buscar producto
+        CarritoDTO item = lista.First(p => p.Producto.IdProducto == id);
+
+        //restamos
+        if (item.Cantidad - 1 > 0)
+        {
+            decimal? precioFinal = item.Producto.Precio;
+
+            item.Cantidad--;
+            item.Total = item.Cantidad * precioFinal;
+        }
+    }
+
+    private void Aumentar(int id)
+    {
+        //buscar producto
+        CarritoDTO item = lista.First(p => p.Producto.IdProducto == id);
+
+        decimal? precioFinal = item.Producto.Precio;
+
+        item.Cantidad++;
+        item.Total = item.Cantidad * precioFinal;
+
+    }
+
+    private async Task Eliminar(int id)
+    {
+        //buscar producto
+        CarritoDTO producto = lista.First(p => p.Producto.IdProducto == id);
+
+        //restamos
+        if (producto != null)
+        {
+            lista.Remove(producto);
+            await carritoServicio.EliminarCarrito(id);
+        }
+    }
+
+}

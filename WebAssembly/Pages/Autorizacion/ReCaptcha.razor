@@ -1,0 +1,45 @@
+﻿<div id="recaptchaDiv"></div>
+
+@code {
+    [Inject]
+    protected IJSRuntime JSRuntime { get; set; }
+
+    [Parameter]
+    public string SiteKey { get; set; }
+
+    [Parameter]
+    public EventCallback<string> OnSuccess { get; set; }
+
+    [Parameter]
+    public EventCallback OnExpired { get; set; }
+
+    private DotNetObjectReference<ReCaptcha>? _dotNetObjReference;
+
+    protected async override Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _dotNetObjReference = DotNetObjectReference.Create(this);
+            await JSRuntime.InvokeVoidAsync("RCJS.Init", _dotNetObjReference, "recaptchaDiv", SiteKey);
+        }
+    }
+
+    [JSInvokable]
+    public void RecaptchaSuccess(string response)
+    {
+        if (OnSuccess.HasDelegate)
+        {
+            OnSuccess.InvokeAsync(response);
+        }
+    }
+
+    [JSInvokable]
+    public void RecaptchaExpired()
+    {
+        if (OnExpired.HasDelegate)
+        {
+            OnExpired.InvokeAsync();
+        }
+    }
+
+}

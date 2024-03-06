@@ -1,0 +1,14 @@
+C:\Users\Yader Barahona\source\repos\EcommerceSalonComunal\Modelo\bin\Debug\net7.0\Modelo.deps.json
+C:\Users\Yader Barahona\source\repos\EcommerceSalonComunal\Modelo\bin\Debug\net7.0\Modelo.runtimeconfig.json
+C:\Users\Yader Barahona\source\repos\EcommerceSalonComunal\Modelo\bin\Debug\net7.0\Modelo.dll
+C:\Users\Yader Barahona\source\repos\EcommerceSalonComunal\Modelo\bin\Debug\net7.0\Modelo.pdb
+C:\Users\Yader Barahona\source\repos\EcommerceSalonComunal\Modelo\obj\Debug\net7.0\Modelo.csproj.AssemblyReference.cache
+C:\Users\Yader Barahona\source\repos\EcommerceSalonComunal\Modelo\obj\Debug\net7.0\Modelo.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\Yader Barahona\source\repos\EcommerceSalonComunal\Modelo\obj\Debug\net7.0\Modelo.AssemblyInfoInputs.cache
+C:\Users\Yader Barahona\source\repos\EcommerceSalonComunal\Modelo\obj\Debug\net7.0\Modelo.AssemblyInfo.cs
+C:\Users\Yader Barahona\source\repos\EcommerceSalonComunal\Modelo\obj\Debug\net7.0\Modelo.csproj.CoreCompileInputs.cache
+C:\Users\Yader Barahona\source\repos\EcommerceSalonComunal\Modelo\obj\Debug\net7.0\Modelo.dll
+C:\Users\Yader Barahona\source\repos\EcommerceSalonComunal\Modelo\obj\Debug\net7.0\refint\Modelo.dll
+C:\Users\Yader Barahona\source\repos\EcommerceSalonComunal\Modelo\obj\Debug\net7.0\Modelo.pdb
+C:\Users\Yader Barahona\source\repos\EcommerceSalonComunal\Modelo\obj\Debug\net7.0\Modelo.genruntimeconfig.cache
+C:\Users\Yader Barahona\source\repos\EcommerceSalonComunal\Modelo\obj\Debug\net7.0\ref\Modelo.dll

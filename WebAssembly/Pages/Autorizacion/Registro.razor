@@ -1,0 +1,136 @@
+﻿@page "/registrarse"
+@layout LoginLayout
+
+@using DTO;
+@using WebAssembly.Auth
+@using WebAssembly.Servicios.IServicios;
+@using Microsoft.AspNetCore.Components.Authorization
+
+@inject IUsuarioServicio usuarioServicio;
+
+@inject NavigationManager navigationManager;
+@inject IToastService toastService;
+@inject AuthenticationStateProvider authenticationProvider;
+
+
+@inject IConfiguration configuration
+@inject IReCaptchaService reCaptchaService
+
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-lg-7">
+            <div class="card rounded-lg mt-5">
+                <div class="card-header"><h3 class="text-center font-weight-light my-4">Crear Cuenta</h3></div>
+                <div class="card-body">
+
+                    <EditForm Model="modelo" OnValidSubmit="GuardarCambios">
+                        <DataAnnotationsValidator></DataAnnotationsValidator>
+
+                        <div class="form-floating mb-3">
+                            <input class="form-control" id="inputEmail" type="text" placeholder="name@example.com" @bind-value="modelo.Nombre" autocomplete="off" />
+                            <label for="inputEmail">Nombre Completo</label>
+                            <ValidationMessage For="@(()=>modelo.Nombre)" />
+                        </div>
+                        <div class="form-floating mb-3">
+                            <input class="form-control" id="inputEmail" type="email" placeholder="name@example.com" @bind-value="modelo.Correo" autocomplete="off" />
+                            <label for="inputEmail">Correo</label>
+                            <ValidationMessage For="@(()=>modelo.Correo)" />
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <div class="form-floating mb-3 mb-md-0">
+                                    <input class="form-control" id="inputPassword" type="password" placeholder="Create a password" @bind-value="modelo.Clave" autocomplete="off" />
+                                    <label for="inputPassword">Contraseña</label>
+                                    <ValidationMessage For="@(()=>modelo.Clave)" />
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-floating mb-3 mb-md-0">
+                                    <input class="form-control" id="inputPasswordConfirm" type="password" placeholder="Confirm password" @bind-value="modelo.ConfirmarClave" autocomplete="off" />
+                                    <label for="inputPasswordConfirm">Confirmar Contraseña</label>
+                                    <ValidationMessage For="@(()=>modelo.ConfirmarClave)" />
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-4 mb-0">
+
+                            <WebAssembly.Pages.Autorizacion.ReCaptcha SiteKey="@_siteKey" OnSuccess="OnSuccess" OnExpired="OnExpired">
+
+
+                            </WebAssembly.Pages.Autorizacion.ReCaptcha>
+                            <span>@_ReCaptchaMsg</span>
+
+                        </div>
+                        <div class="mt-4 mb-0">
+                            <div class="d-grid"><button class="btn btn-primary btn-block" disabled="@disabled" type="submit">Registrarse</button></div>
+                        </div>
+                    </EditForm>
+
+                </div>
+                <div class="card-footer text-center py-3">
+                    <div class="small"><a href="/login">Tienes una cuenta? ir a login</a></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private UsuarioDTO modelo = new UsuarioDTO();
+
+    private bool disabled = true;
+
+    private async Task GuardarCambios()
+    {
+        if (modelo.Clave != modelo.ConfirmarClave)
+        {
+            toastService.ShowWarning("Las contraseñas no coinciden");
+        }
+
+        modelo.Rol = "Cliente";
+
+        var response = await usuarioServicio.Crear(modelo);
+
+        if (response.Ok)
+        {
+            toastService.ShowSuccess("Su cuenta ha sido creada");
+            navigationManager.NavigateTo("/login");
+        }
+        else
+        {
+            toastService.ShowError("Error al crear cuenta, vuelve a intentarlo");
+        }
+    }
+
+    private string _ReCaptchaMsg = "";
+    private string _siteKey = "";
+    private string _secretKey = "";
+
+    protected override void OnInitialized()
+    {
+
+        _siteKey = configuration["SiteKey"];
+        _secretKey = configuration["SecretKey"];
+
+    }
+
+    private async void OnSuccess(string reCaptchaResponse)
+    {
+        var isValid = await reCaptchaService.ValidateResponse(reCaptchaResponse, _secretKey);
+
+        _ReCaptchaMsg = isValid ? "" : "Error, intenta de nuevo..";
+
+        if (isValid)
+        {
+            disabled = false;
+        }
+
+        StateHasChanged();
+    }
+
+    private void OnExpired()
+    {
+        _ReCaptchaMsg = "Expired";
+        StateHasChanged();
+    }
+}

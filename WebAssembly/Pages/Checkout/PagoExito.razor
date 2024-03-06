@@ -1,0 +1,138 @@
+﻿@page "/pago-exito"
+
+@inject ICarritoServicio carritoServicio
+@inject IReservaServicio reservaServicio
+@inject IToastService toastService
+@inject NavigationManager navigationManager
+
+@inject IEmailServicio EmailSenderService
+
+@using Microsoft.AspNetCore.Components.Authorization
+@using System.Security.Claims
+@using global::Utilidades;
+
+@attribute [Authorize(Roles = "Administrador, Cliente")];
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-6 offset-md-3">
+            <div class="mensaje text-center">
+                <h4>Pago parcial realizado con éxito</h4>
+                <p>¡Gracias por tu compra!</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    //habilitar o deshabilitar boton de pago
+    private bool disabled = true;
+
+    private List<CarritoDTO> lista = new List<CarritoDTO>();
+
+    private decimal? totalPagar = 0;
+
+    private decimal? totalPagado = 0;
+
+    [CascadingParameter]
+    private Task<AuthenticationState> authenticationState { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        lista = await carritoServicio.DevolverCarrito();
+
+        // Guardar la reserva si la URL actual es la URL de éxito de Stripe
+        await VerificarYGuardarReserva();
+
+        await SendEmail();
+    }
+
+    private bool EsRutaPagoExitoso(string url)
+    {
+        // Verificar si la URL termina con "/pago-exito"
+        return url.StartsWith("https://localhost:7290/pago-exito", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private async Task VerificarYGuardarReserva()
+    {
+        // Obtener la URL actual
+        var currentUri = navigationManager.Uri;
+
+        // Verificar si la URL actual es la URL de éxito de Stripe
+        if (EsRutaPagoExitoso(currentUri))
+        {
+            await GuardarReserva();
+        }
+    }
+
+    private async Task SendEmail()
+    {
+        var authState = await authenticationState;
+        string usuario = authState.User.Claims.Where(c => c.Type == ClaimTypes.Name).Select(c => c.Value).Single();
+        string email = authState.User.Claims.Where(c => c.Type == ClaimTypes.Email).Select(c => c.Value).Single();
+
+        MailRequest mail = new MailRequest
+            {
+                Subject = "Pago parcial realizado con éxito",
+                Email = email,
+                //Email = "oxtr_ayqdl55@bozev.com",
+                body = "Hola, este correo es para informar sobre la verificación del pago del usuario: " + usuario
+            };
+
+        await EmailSenderService.SendEmailAsync(mail);
+
+        toastService.ShowSuccess("Se ha enviado un correo eléctronico");
+
+    }
+
+    private async Task GuardarReserva()
+    {
+        List<DetalleReservaDTO> detalle = new List<DetalleReservaDTO>();
+
+        foreach (var item in lista)
+        {
+            detalle.Add(new DetalleReservaDTO()
+                {
+                    IdProducto = item.Producto.IdProducto,
+                    Cantidad = item.Cantidad,
+                    Total = item.Total
+                }
+            );
+        }
+
+        var authState = await authenticationState;
+        string idUsuario = authState.User.Claims.Where(c => c.Type == ClaimTypes.NameIdentifier).Select(c => c.Value).Single();
+
+        //
+        decimal? totalSum = lista.Sum(i => i.Total);
+        decimal totalSumNonNull = totalSum ?? 0m;
+        decimal resultado = totalSumNonNull * 0.25m;
+        decimal resultadoRedondeado = Math.Round(resultado, 2);
+
+        ReservaDTO modelo = new ReservaDTO()
+            {
+                IdUsuario = Convert.ToInt32(idUsuario),
+                TotalPrecio = lista.Sum(i => i.Total),
+                TotalPagado = resultadoRedondeado,
+                DetalleReservas = detalle,
+                FechaEvento = DateTime.Today.AddDays(7),
+                EstadoReserva = false,
+            };
+
+        var response = await reservaServicio.Registrar(modelo);
+
+        if (response.Ok)
+        {
+            await carritoServicio.LimpiarCarrito();
+            toastService.ShowSuccess("Reserva registrada con éxito");
+            //navigationManager.NavigateTo("/catalogo");
+        }
+        else
+        {
+            toastService.ShowError(response.Message);
+        }
+    }
+
+
+
+}
